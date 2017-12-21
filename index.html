@@ -1,0 +1,191 @@
+<html>
+    <head>
+        <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.2/underscore-min.js"></script>
+        <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+        
+        <script>
+            var deck = [];
+            for (var i = 0; i < 13; i++) {
+                for (var j = 0; j < 4; j++) {
+                    deck.push(i);
+                }
+            }
+            deck.push(13);
+            deck.push(13);
+            
+            var players = [];
+            
+            function makePlayer(name) {
+                players.push( {
+                    name: name,
+                    wins: 0,
+                    hand: null
+                });
+            }
+            
+            makePlayer("Sassu");
+            makePlayer("Daddy");
+            
+            var draws = 0;
+            var games = 0;
+            var nonDrawTurns = 0;
+            var turns = 0;
+            var donePlaying = true;
+            var gameStats=[];
+            
+            function tournament() {
+                if (donePlaying) {
+                    donePlaying = false;
+                    for (var i = 0; i < players.length; i++) {
+                        $($("#player" + i + " td")[0]).text(players[i].name);
+                    }
+                    if (games - draws > 0) {
+                        var msg = [];
+                        for (var i = 0; i < gameStats.length; i++) {
+                            msg.push(gameStats[i].turns);
+                        }
+                        $("#avgTurns").text(nonDrawTurns/(games - draws) + " (" + msg.join(", ") + ")");
+                    }
+                    play();
+                }
+                setTimeout(tournament, 1000);
+            }
+            
+            function play() {
+                games++;
+                deck = _.shuffle(deck);
+                var hands = [];
+                for (var i = 0; i < players.length; i++) {
+                    hands.push([]);
+                    players[i].hand = hands[i];
+                }
+                var hand = 0;
+                for (var i = 0; i < deck.length; i++) {
+                    hands[hand].push(deck[i]);
+                    hand = (hand + 1) % players.length;
+                }
+                turns = 0;
+                playStep();
+            }
+            
+            var step = 0;
+            function playStep() {
+                var nonEmptyHands = 0;
+                var winner;
+                var totalCards = 0;
+                for (var i = 0; i < players.length; i++) {
+                    totalCards += players[i].hand.length;
+                    if (players[i].hand.length > 0) {
+                        nonEmptyHands++;
+                        winner = i;
+                    }
+                }
+                if (nonEmptyHands == 1) {
+                    nonDrawTurns += turns;
+                    players[winner].wins++;
+                    gameStats.push({
+                            turns: turns
+                        });
+                    $($("#player" + winner + " td")[3]).text(players[winner].wins);
+                    donePlaying = true;
+                } else {
+                    if (turns > 3600 * 8) {
+                        draws++;
+                        donePlaying = true;
+                        $("#draws").text(draws);
+                    } else {
+                        var playing = [];
+                turns++;
+                        turn();
+                        for (var i = 0; i < players.length; i++) {
+                            $($("#player" + i + " td")[2]).text(players[i].hand.length);
+                        }
+                        if (step > 0 && step % 3600 == 0) {
+                            step = 0;
+                            setTimeout(playStep, 0);
+                        } else {
+                            step++;
+                            playStep();
+                        }
+                    }
+                }
+            }
+            
+            function turn(stillPlaying, playing) {
+                if (stillPlaying == null) {
+                    stillPlaying = {};
+                    for (var i = 0; i < players.length; i++) {
+                        stillPlaying[i] = true;
+                    }
+                }
+                if (playing == null) playing = [];
+                var topCard = null;
+                var played = {};
+                for (var i in stillPlaying) {
+                    var card = "-";
+                    if (players[i].hand.length > 0) {
+                        card = played[i] = players[i].hand.pop();
+                        if (topCard == null || topCard < played[i]) {
+                            topCard = played[i];
+                        }
+                    }
+                    $($("#player" + i + " td")[1]).text(card);
+                }
+                playing.push(played);
+                var winners = {};
+                var winner;
+                for (var i in played) {
+                    if (played[i] == topCard) {
+                        winners[i] = true;
+                        winner = i;
+                    }
+                }
+                if (Object.keys(winners).length > 1) {
+                    var blind = {};
+                    for (var i in winners) {
+                        if (players[i].hand.length > 0) {
+                            blind[i] = players[i].hand.pop();
+                        }
+                    }
+                    playing.push(blind);
+                    turn(winners, playing);
+                } else {
+                    var wonCards = [];
+                    for (var i = 0; i < playing.length; i++) {
+                        for (j in playing[i]) {
+                            wonCards.push(playing[i][j]);
+                        }
+                    }
+                    for (var i = 0; i < wonCards.length; i++) {
+                        players[winner].hand.unshift(wonCards[i]);
+                    }
+                    return winner; 
+                }
+            }
+        </script>
+    </head>
+    <body onload="tournament()">
+        <table>
+            <tr>
+                <td></td>
+                <td>Plays</td>
+                <td>Cards</td>
+                <td>Wins</td>
+            </tr>
+            <tr id="player0">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr id="player1">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </table>
+        <p>Avg. Turns <span id="avgTurns"></span></p>
+        <p>Draw <span id="draws"></span></p>
+    </body>
+</html>
